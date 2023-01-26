@@ -13,10 +13,35 @@ public class MainSynchronized {
     private static final int numberOfRoutes = 1000;
     private static final Map<Integer, Integer> sizeToFreq = new HashMap<>();
     private static int value;// random frequencies of the letter 'R'
+    private static int maxValue;
 
     public static void main(String[] args) throws InterruptedException {
-        int maxValue;
+
+        Thread maxThread;// thread for maximum
         System.out.println("Main starts!!!");
+
+        maxThread = new Thread(() -> {
+            while (!Thread.interrupted()) {
+                synchronized (sizeToFreq) {
+                    try {
+                        sizeToFreq.wait();
+                    } catch (InterruptedException e) {
+                        System.out.println("Поток поиска максимума был прерван потоком 'main'");;
+                    }
+
+                    maxValue = Collections.max(sizeToFreq.values());
+                    for (Map.Entry<Integer, Integer> set : sizeToFreq.entrySet()) {
+                        if (set.getValue() == maxValue) {
+                            System.out.println("Самое частое количество повторений " + set.getKey() + " (встретилось "
+                                    + maxValue + " раз)");
+                        }
+
+                    }
+
+                }
+            }
+        });
+        maxThread.start();
 
         // In each thread we generate text and synchronously count the number of
         // commands to the right
@@ -31,8 +56,8 @@ public class MainSynchronized {
                     }
                 }
                 fillSizeToFreq(resultR);
-                System.out.println("В строке из 100 символов присутствует " + resultR + " символов R");
-
+                // System.out.println("В строке из 100 символов присутствует " + resultR + "
+                // символов R");
 
             });
 
@@ -40,25 +65,8 @@ public class MainSynchronized {
             thread.join();
         }
 
-        System.out.println();
-        maxValue = Collections.max(sizeToFreq.values());
-        for (Map.Entry<Integer, Integer> set : sizeToFreq.entrySet()) {
-            if (set.getValue() == maxValue) {
-                System.out.println(
-                        "Самое частое количество повторений " + set.getKey() + " (встретилось " + maxValue + " раз)");
-            }
-
-        }
-        System.out.println("Другие размеры: ");
-        for (Map.Entry<Integer, Integer> set : sizeToFreq.entrySet()) {
-            if (set.getValue() == maxValue) {
-                continue;
-            } else {
-                System.out.println("- " + set.getKey() + "(" + set.getValue() + " раз)");
-            }
-
-
-        }
+        maxThread.interrupt();
+        maxThread.join();
         // return to thread main
         System.out.println("Main ends!!!");
     }
@@ -73,13 +81,19 @@ public class MainSynchronized {
     }
 
     // Synchronized map filling method
-    private synchronized static HashMap<Integer, Integer> fillSizeToFreq(int countOfR) {
-        if (sizeToFreq.containsKey(countOfR)) {
-            value = sizeToFreq.get(countOfR) + 1;
-        } else {
-            value = 1;
+    private static HashMap<Integer, Integer> fillSizeToFreq(int countOfR) {
+        synchronized (sizeToFreq) {
+            if (sizeToFreq.containsKey(countOfR)) {
+                value = sizeToFreq.get(countOfR) + 1;
+            } else {
+                value = 1;
+            }
+            sizeToFreq.put(countOfR, value);
+            sizeToFreq.notify();
         }
-        sizeToFreq.put(countOfR, value);
+
         return (HashMap<Integer, Integer>) sizeToFreq;
     }
 }
+
+
